@@ -10,6 +10,9 @@ import pytz  # Para determinar zona horaria
 from json.decoder import JSONDecodeError
 import os
 
+from utilities import *
+
+
 URL_per_year = 'https://datosabiertos.compraspublicas.gob.ec/PLATAFORMA/api/search_ocds?year='
 URL_per_ocid = 'https://datosabiertos.compraspublicas.gob.ec/PLATAFORMA/api/record?ocid='
 url_proyect = os.getcwd()
@@ -104,7 +107,7 @@ def generateDatasets(year,
     print('Tiempo total de ejecución: ', time.time() - t_start)
 
 
-def load_data(year):
+def load_resume_data(year):
     batches = 0
     try:
         directory = os.getcwd() + '\\data\\resume\\' + str(year)
@@ -122,18 +125,21 @@ def load_data(year):
 
 
 def getComplete_data(year,
-                     size_batch=15000,
-                     total_batches=None,
-                     starts=0,
-                     ends=None
+                     size_batch=10000, # No usar tamaños mayores a 12000 o sino github no permitirá subirlos al repo
+                     ready_made_batches=0,
+                     batches=None
                      ):
-    df = load_data(year).dropna(subset=["ocid"]).sort_values(by="date", ascending=True)
+    df = load_resume_data(year).dropna(subset=["ocid"]).sort_values(by="date", ascending=True)
 
     ocid_codes = df.loc[:, "ocid"].unique().tolist()
-    total_batches = ceil(len(ocid_codes) / size_batch)
 
-    if ends is None: ends = len(ocid_codes)
+    starts = ready_made_batches * size_batch
+    if batches is None:
+        ends = len(ocid_codes)
+    else:
+        ends = (ready_made_batches + batches) * size_batch
 
+    total_batches = ceil(ends / size_batch)
     print("Total batches:    ", total_batches)
     print("Total ocid codes: ", len(ocid_codes))
     print("\nstarts: ", starts)
@@ -142,56 +148,110 @@ def getComplete_data(year,
     data = {
         "year": int(year),
         "total_ocid": len(ocid_codes),
+        "total_posible_batches": ceil(len(ocid_codes) / size_batch),
+        "batches": total_batches,
         "content": []
     }
     data_per_batch = {
         "year": int(year),
         "total_ocid": len(ocid_codes),
+        "total_posible_batches": ceil(len(ocid_codes) / size_batch),
         "batches": total_batches,
-        "batch": 1,
+        "batch": ready_made_batches + 1,
         "content": []
     }
 
-    batch = 0
-    for i in range(starts, ends):
-        ocid = ocid_codes[i]
-        if i % 50 == 0:  # Tiempo de espera cada 50 peticiones
-            time.sleep(30)  # añade un retraso de 30s
+    try:
+        os.makedirs(url_proyect + '/data/complete/' + str(year))
+    except FileExistsError as fer:
+        print('\tLa carpeta \''+url_proyect + '/data/complete/' + str(year)+'\' ya ha sido creada')
 
-        # TODO validar la conexión tipo 200. Si no es 200, esperar 30s y volver a intentar hasta que si se pueda
-        '''
-        time_to_wait = 30
-        while condition:
-            try:
-               data["content"]+getData(label_content='releases', iterable_code=ocid)
-            except xxx xxx:
-                #...
-                time.sleep(time_to_wait)
-                time_to_wait+=10
-        '''
+    time_zone = pytz.timezone('America/Guayaquil')
+    dt_string = dt.now(time_zone).strftime("%d-%m-%Y %Hh%Mm%Ss")
+    txt_name = "logError_CompleteData" + str(year) + " - " + dt_string + ".txt"
+    with open(url_proyect + '/logs/' + txt_name, 'w') as file:
+        t_begin = time.time()
+        file.write("iteration_num,times_tried,ocid_code,date_error,time_error,error_message\n")  # Encabezado
 
-        if i % size_batch == 0 or i == ends - 1:
-            batch += 1
-            name = "dataComplete" + str(year) + "_batch" + str(batch) + ".json"
-            with open(name, 'w') as file:
-                json.dump(data_per_batch, file, indent=4)
-                # TODO verificar si el indent=4 hace que se cree un archivo innecesariamente muy grande
-            if batch != total_batches: data_per_batch = {"year": int(year), "total_ocid": len(ocid_codes),
-                                                         "batches": total_batches, "batch": batch + 1,
-                                                         "content": []}
+        for n_consulta in range(starts):
+            progress_bar(actual_value=n_consulta+1,
+                         max_value=ends,
+                         initial_message="Progress:",
+                         end_message=' |  ' + get_str_time_running(t_begin))
 
-    name = "dataComplete" + str(year) + "_all.json"
-    with open(name, 'w') as file:
-        json.dump(data_per_batch, file, indent=4)
-        # TODO verificar si el indent=4 hace que se cree un archivo innecesariamente muy grande
+        batch = ready_made_batches
+        for i in range(starts, ends):
+            ocid = ocid_codes[i]
+            if (i + 1) % 50 == 0:  # Tiempo de espera cada 50 peticiones
+                progress_bar(actual_value=i,
+                             max_value=ends,
+                             initial_message="Progress:",
+                             end_message='⏳|  ' + get_str_time_running(t_begin) + '  |  ocid code: ' + ocid
+                             )
+                time.sleep(30)  # añade un retraso de 30s
+
+            times_tried = 0
+            time_to_wait = 30
+            reload_page = True
+            while reload_page:  # Si surgen errores volvemos a hacer el request luego de un tiempo (time_to_wait)
+                times_tried += 1
+                try:
+                    ocid_process = getData(label_content='releases', iterable_code=ocid)
+                    data["content"] += ocid_process
+                    data_per_batch["content"] += ocid_process
+                    reload_page = False
+                except JSONDecodeError as jsondecErr:
+                    time.sleep(time_to_wait)
+                    time_to_wait += 10
+                    reload_page = True
+
+                    error_message = str(jsondecErr)
+                    time_error = dt.now(time_zone).strftime("%H:%M:%S")
+                    date_error = dt.now(time_zone).strftime("%d/%m/%Y")
+
+                    file.write(str(i) + ',' + str(times_tried) + ',' + str(ocid) + ',' + date_error + ',' + time_error + ',' + error_message + "\n")
+
+                    print(color.LIGHTRED_EX + "\n\t" + error_message + "\n\tin ocid", str(ocid) + "\n")
+                except Exception as err:
+                    time.sleep(time_to_wait)
+                    time_to_wait += 10
+                    reload_page = times_tried < 5  # No va a haber más de 5 intentos por un error de conexion al api
+                    # Al quinto intento se dejará de intentar consultar ese código ocid
+
+                    error_message = str(err)
+                    time_error = dt.now(time_zone).strftime("%H:%M:%S")
+                    date_error = dt.now(time_zone).strftime("%d/%m/%Y")
+                    file.write(str(i) + ',' + str(times_tried) + ',' + str(ocid) + ',' + date_error + ',' + time_error + ',' + error_message + "\n")
+
+                    print(color.LIGHTRED_EX + "\n\t" + error_message + "\n\tin ocid", str(ocid) + "\n")
+
+            if (i + 1) % size_batch == 0 or (i + 1) == ends:
+                batch += 1
+                name = "dataComplete" + str(year) + "_batch" + str(batch) + ".json"
+                with open(url_proyect + '/data/complete/' + str(year) + '/' + name, 'w') as file:
+                    json.dump(data_per_batch, file, indent=4)
+                    # TODO verificar si el indent=4 hace que se cree un archivo innecesariamente muy grande
+                if batch != total_batches:
+                    data_per_batch = {
+                        "year": int(year),
+                        "total_ocid": len(ocid_codes),
+                        "total_posible_batches": ceil(len(ocid_codes) / size_batch),
+                        "batches": total_batches,
+                        "batch": batch + 1,
+                        "content": []
+                    }
+
+            progress_bar(actual_value = i+1,
+                         max_value=ends,
+                         initial_message="Progress:",
+                         end_message=' |  ' + get_str_time_running(t_begin) + '  |  ocid code: ' + ocid
+                         )
+
+
 
 
 if __name__ == '__main__':
-    year = '2020'
+    year = '2022'
     # generateDatasets(year=year, total_pages=getPages_per_year(year))
-    # df = getComplete_data(year)
-    # print(df.columns)
-    # print(df.head().to_string())
-    # print(getComplete_data(year))
-
-    # print(getData(label_content='releases', iterable_code='ocds-5wno2w-SIE-HIESSRIO-46-2020-2561'))
+    getComplete_data(year=year)
+    #getComplete_data(year=year, ready_made_batches=1)
