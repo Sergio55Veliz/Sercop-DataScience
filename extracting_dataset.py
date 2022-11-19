@@ -62,8 +62,8 @@ def generateDatasets(year,
     time_zone = pytz.timezone('America/Guayaquil')
     dt_string = dt.now(time_zone).strftime("%d-%m-%Y %Hh%Mm%Ss")
     txt_name = "logError" + str(year) + " - " + dt_string + ".txt"
-    with open(url_proyect + '\\logs\\' + txt_name, 'w') as file:
-        file.write("page,date_error,time_error,error_message\n")  # Encabezado
+    with open(url_proyect + '\\logs\\' + txt_name, 'w') as file_errors:
+        file_errors.write("page,date_error,time_error,error_message\n")  # Encabezado
 
         for page in range(1, total_pages + 1):
             if page % 50 == 0:  # Tiempo de espera cada 50 peticiones
@@ -77,7 +77,7 @@ def generateDatasets(year,
                 error_message = str(jsondecErr)
                 time_error = dt.now(time_zone).strftime("%H:%M:%S")
                 date_error = dt.now(time_zone).strftime("%d/%m/%Y")
-                file.write(str(page) + ',' + date_error + ',' + time_error + ',' + error_message + "\n")
+                file_errors.write(str(page) + ',' + date_error + ',' + time_error + ',' + error_message + "\n")
 
                 print("\n\t" + error_message + "\n\tin page", str(page) + "\n")
                 pass
@@ -85,7 +85,7 @@ def generateDatasets(year,
                 error_message = str(err)
                 time_error = dt.now(time_zone).strftime("%H:%M:%S")
                 date_error = dt.now(time_zone).strftime("%d/%m/%Y")
-                file.write(str(page) + ',' + date_error + ',' + time_error + ',' + error_message + "\n")
+                file_errors.write(str(page) + ',' + date_error + ',' + time_error + ',' + error_message + "\n")
 
                 print("\n\t" + error_message + "\n\tin page", str(page) + "\n")
                 pass
@@ -145,13 +145,6 @@ def getComplete_data(year,
     print("\nstarts: ", starts)
     print("ends:   ", ends, end="\n\n")
 
-    data = {
-        "year": int(year),
-        "total_ocid": len(ocid_codes),
-        "total_posible_batches": ceil(len(ocid_codes) / size_batch),
-        "batches": total_batches,
-        "content": []
-    }
     data_per_batch = {
         "year": int(year),
         "total_ocid": len(ocid_codes),
@@ -166,12 +159,15 @@ def getComplete_data(year,
     except FileExistsError as fer:
         print('\tLa carpeta \''+url_proyect + '/data/complete/' + str(year)+'\' ya ha sido creada')
 
+    conection_errors = 0
+    json_errors = 0
+
     time_zone = pytz.timezone('America/Guayaquil')
     dt_string = dt.now(time_zone).strftime("%d-%m-%Y %Hh%Mm%Ss")
     txt_name = "logError_CompleteData" + str(year) + " - " + dt_string + ".txt"
-    with open(url_proyect + '/logs/' + txt_name, 'w') as file:
+    with open(url_proyect + '/logs/' + txt_name, 'w') as file_errors:
         t_begin = time.time()
-        file.write("iteration_num,times_tried,ocid_code,date_error,time_error,error_message\n")  # Encabezado
+        file_errors.write("iteration_num,times_tried,ocid_code,date_error,time_error,error_message\n")  # Encabezado
 
         for n_consulta in range(starts):
             progress_bar(actual_value=n_consulta+1,
@@ -181,12 +177,13 @@ def getComplete_data(year,
 
         batch = ready_made_batches
         for i in range(starts, ends):
+            errors_text = '⚠errors: 🌐'+str(conection_errors) + '  📃'+str(json_errors)
             ocid = ocid_codes[i]
             if (i + 1) % 50 == 0:  # Tiempo de espera cada 50 peticiones
                 progress_bar(actual_value=i,
                              max_value=ends,
                              initial_message="Progress:",
-                             end_message='⏳|  ' + get_str_time_running(t_begin) + '  |  ocid code: ' + ocid
+                             end_message='⏳|  ' + get_str_time_running(t_begin) + '  |  ' + errors_text + '  |  ocid code: ' + ocid
                              )
                 time.sleep(30)  # añade un retraso de 30s
 
@@ -197,10 +194,16 @@ def getComplete_data(year,
                 times_tried += 1
                 try:
                     ocid_process = getData(label_content='releases', iterable_code=ocid)
-                    data["content"] += ocid_process
                     data_per_batch["content"] += ocid_process
                     reload_page = False
                 except JSONDecodeError as jsondecErr:
+                    json_errors+=1
+                    progress_bar(actual_value=i + 1,
+                                 max_value=ends,
+                                 initial_message="Progress:",
+                                 end_message='⏳|  ' + get_str_time_running(t_begin) + '  |  ' + errors_text + '  |  ocid code: ' + ocid,
+                                 error_indicator=True
+                                 )
                     time.sleep(time_to_wait)
                     time_to_wait += 10
                     reload_page = True
@@ -209,28 +212,34 @@ def getComplete_data(year,
                     time_error = dt.now(time_zone).strftime("%H:%M:%S")
                     date_error = dt.now(time_zone).strftime("%d/%m/%Y")
 
-                    file.write(str(i) + ',' + str(times_tried) + ',' + str(ocid) + ',' + date_error + ',' + time_error + ',' + error_message + "\n")
+                    file_errors.write(str(i) + ',' + str(times_tried) + ',' + str(ocid) + ',' + date_error + ',' + time_error + ',' + error_message + "\n")
 
-                    print(color.LIGHTRED_EX + "\n\t" + error_message + "\n\tin ocid", str(ocid) + "\n")
+                    #print(color.LIGHTRED_EX + "\n\t" + error_message + "\n\tin ocid", str(ocid) + "\n")
                 except Exception as err:
+                    conection_errors+=1
+                    progress_bar(actual_value=i + 1,
+                                 max_value=ends,
+                                 initial_message="Progress:",
+                                 end_message='⏳|  ' + get_str_time_running(t_begin) + '  |  ' + errors_text + '  |  ocid code: ' + ocid,
+                                 error_indicator=True
+                                 )
                     time.sleep(time_to_wait)
                     time_to_wait += 10
-                    reload_page = times_tried < 5  # No va a haber más de 5 intentos por un error de conexion al api
+                    reload_page = times_tried < 5  # o va a haber más de 5 intentos por un error de conexion al api
                     # Al quinto intento se dejará de intentar consultar ese código ocid
 
                     error_message = str(err)
                     time_error = dt.now(time_zone).strftime("%H:%M:%S")
                     date_error = dt.now(time_zone).strftime("%d/%m/%Y")
-                    file.write(str(i) + ',' + str(times_tried) + ',' + str(ocid) + ',' + date_error + ',' + time_error + ',' + error_message + "\n")
+                    file_errors.write(str(i) + ',' + str(times_tried) + ',' + str(ocid) + ',' + date_error + ',' + time_error + ',' + error_message + "\n")
 
-                    print(color.LIGHTRED_EX + "\n\t" + error_message + "\n\tin ocid", str(ocid) + "\n")
+                    #print(color.LIGHTRED_EX + "\n\t" + error_message + "\n\tin ocid", str(ocid) + "\n")
 
             if (i + 1) % size_batch == 0 or (i + 1) == ends:
                 batch += 1
                 name = "dataComplete" + str(year) + "_batch" + str(batch) + ".json"
-                with open(url_proyect + '/data/complete/' + str(year) + '/' + name, 'w') as file:
-                    json.dump(data_per_batch, file, indent=4)
-                    # TODO verificar si el indent=4 hace que se cree un archivo innecesariamente muy grande
+                with open(url_proyect + '/data/complete/' + str(year) + '/' + name, 'w') as file_batch:
+                    json.dump(data_per_batch, file_batch, indent=4)
                 if batch != total_batches:
                     data_per_batch = {
                         "year": int(year),
@@ -244,7 +253,7 @@ def getComplete_data(year,
             progress_bar(actual_value = i+1,
                          max_value=ends,
                          initial_message="Progress:",
-                         end_message=' |  ' + get_str_time_running(t_begin) + '  |  ocid code: ' + ocid
+                         end_message='⏳|  ' + get_str_time_running(t_begin) + '  |  ' + errors_text + '  |  ocid code: ' + ocid
                          )
 
 

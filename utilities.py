@@ -7,12 +7,16 @@ def progress_bar(actual_value,
                  size_bar=50,
                  character='■',
                  initial_message="Progress:",
-                 end_message=''):
+                 end_message='',
+                 error_indicator=False):
 
     percent = actual_value/max_value
     message = '\r' + initial_message + ' [{0:'+str(size_bar)+'s}] {1:6d}/{2:1d} ' + end_message
     if percent<1:
-        sys.stdout.write(color.LIGHTYELLOW_EX + message.format(character * int(size_bar * percent), actual_value, max_value))
+        if error_indicator:
+            sys.stdout.write(color.LIGHTRED_EX + message.format(character * int(size_bar * percent), actual_value, max_value))
+        else:
+            sys.stdout.write(color.LIGHTYELLOW_EX + message.format(character * int(size_bar * percent), actual_value, max_value))
         sys.stdout.flush()
     else:
         sys.stdout.write(color.BLUE + message.format(character * int(size_bar * percent), actual_value, max_value))
