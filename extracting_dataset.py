@@ -1,21 +1,18 @@
-import pandas as pd
-import numpy as np
+from __init__ import *
+
 from math import ceil
 import requests
 import json
 
-import time
-from datetime import date, datetime as dt
+from datetime import datetime as dt
 import pytz  # Para determinar zona horaria
 from json.decoder import JSONDecodeError
-import os
 
-from utilities import *
-
+from utilities.utilities import *
+from utilities.zip_files import *
 
 URL_per_year = 'https://datosabiertos.compraspublicas.gob.ec/PLATAFORMA/api/search_ocds?year='
 URL_per_ocid = 'https://datosabiertos.compraspublicas.gob.ec/PLATAFORMA/api/record?ocid='
-url_proyect = os.getcwd()
 
 
 def getPages_per_year(year):
@@ -45,15 +42,8 @@ def generateDatasets(year,
                      total_pages=10,
                      size_batch=1500,
                      total_batches=None):
-    try:
-        os.makedirs(url_proyect + '\\logs')
-    except FileExistsError as fer:
-        print(str(fer))
-
-    try:
-        os.makedirs(url_proyect + '\\data\\resume\\' + str(year))
-    except FileExistsError as fer:
-        print(str(fer))
+    verify_create_folder(url_proyect + '/logs')
+    verify_create_folder(url_proyect + '/data/resume/' + str(year))
 
     t_start = time.time()
     listAux = []
@@ -62,7 +52,7 @@ def generateDatasets(year,
     time_zone = pytz.timezone('America/Guayaquil')
     dt_string = dt.now(time_zone).strftime("%d-%m-%Y %Hh%Mm%Ss")
     txt_name = "logError" + str(year) + " - " + dt_string + ".txt"
-    with open(url_proyect + '\\logs\\' + txt_name, 'w') as file_errors:
+    with open(url_proyect + '/logs/' + txt_name, 'w') as file_errors:
         file_errors.write("page,date_error,time_error,error_message\n")  # Encabezado
 
         for page in range(1, total_pages + 1):
@@ -108,11 +98,11 @@ def generateDatasets(year,
 
 
 def load_resume_data(year):
-    batches = 0
     try:
         directory = os.getcwd() + '\\data\\resume\\' + str(year)
         batches = len(os.listdir(directory))
     except FileNotFoundError as fnf_err:
+        batches = 0
         print("\n\tDirectory not found")
         print(str(fnf_err))
         return
@@ -125,7 +115,7 @@ def load_resume_data(year):
 
 
 def getComplete_data(year,
-                     size_batch=10000, # No usar tamaños mayores a 12000 o sino github no permitirá subirlos al repo
+                     size_batch=10000,  # No usar tamaños mayores a 12000 o sino github no permitirá subirlos al repo
                      ready_made_batches=0,
                      batches=None
                      ):
@@ -141,8 +131,8 @@ def getComplete_data(year,
 
     total_batches = ceil(ends / size_batch)
     print("Total batches:    ", total_batches)
-    print("Total ocid codes: ", len(ocid_codes))
-    print("\nstarts: ", starts)
+    print("Total ocid codes: ", len(ocid_codes), end="\n\n")
+    print("starts: ", starts)
     print("ends:   ", ends, end="\n\n")
 
     data_per_batch = {
@@ -154,10 +144,8 @@ def getComplete_data(year,
         "content": []
     }
 
-    try:
-        os.makedirs(url_proyect + '/data/complete/' + str(year))
-    except FileExistsError as fer:
-        print('\tLa carpeta \''+url_proyect + '/data/complete/' + str(year)+'\' ya ha sido creada')
+    verify_create_folder(url_proyect + '/logs')
+    verify_create_folder(url_proyect + '/data/complete/' + str(year))
 
     conection_errors = 0
     json_errors = 0
@@ -170,20 +158,21 @@ def getComplete_data(year,
         file_errors.write("iteration_num,times_tried,ocid_code,date_error,time_error,error_message\n")  # Encabezado
 
         for n_consulta in range(starts):
-            progress_bar(actual_value=n_consulta+1,
+            progress_bar(actual_value=n_consulta + 1,
                          max_value=ends,
                          initial_message="Progress:",
                          end_message=' |  ' + get_str_time_running(t_begin))
 
         batch = ready_made_batches
         for i in range(starts, ends):
-            errors_text = '⚠errors: 🌐'+str(conection_errors) + '  📃'+str(json_errors)
+            errors_text = '⚠errors: 🌐' + str(conection_errors) + '  📃' + str(json_errors)
             ocid = ocid_codes[i]
             if (i + 1) % 50 == 0:  # Tiempo de espera cada 50 peticiones
                 progress_bar(actual_value=i,
                              max_value=ends,
                              initial_message="Progress:",
-                             end_message='⏳|  ' + get_str_time_running(t_begin) + '  |  ' + errors_text + '  |  ocid code: ' + ocid
+                             end_message='⏳|  ' + get_str_time_running(
+                                 t_begin) + '  |  ' + errors_text + '  |  ocid code: ' + ocid
                              )
                 time.sleep(30)  # añade un retraso de 30s
 
@@ -197,11 +186,12 @@ def getComplete_data(year,
                     data_per_batch["content"] += ocid_process
                     reload_page = False
                 except JSONDecodeError as jsondecErr:
-                    json_errors+=1
+                    json_errors += 1
                     progress_bar(actual_value=i + 1,
                                  max_value=ends,
                                  initial_message="Progress:",
-                                 end_message='⏳|  ' + get_str_time_running(t_begin) + '  |  ' + errors_text + '  |  ocid code: ' + ocid,
+                                 end_message='⏳|  ' + get_str_time_running(
+                                     t_begin) + '  |  ' + errors_text + '  |  ocid code: ' + ocid,
                                  error_indicator=True
                                  )
                     time.sleep(time_to_wait)
@@ -212,15 +202,17 @@ def getComplete_data(year,
                     time_error = dt.now(time_zone).strftime("%H:%M:%S")
                     date_error = dt.now(time_zone).strftime("%d/%m/%Y")
 
-                    file_errors.write(str(i) + ',' + str(times_tried) + ',' + str(ocid) + ',' + date_error + ',' + time_error + ',' + error_message + "\n")
+                    file_errors.write(str(i) + ',' + str(times_tried) + ',' + str(
+                        ocid) + ',' + date_error + ',' + time_error + ',' + error_message + "\n")
 
-                    #print(color.LIGHTRED_EX + "\n\t" + error_message + "\n\tin ocid", str(ocid) + "\n")
+                    # print(color.LIGHTRED_EX + "\n\t" + error_message + "\n\tin ocid", str(ocid) + "\n")
                 except Exception as err:
-                    conection_errors+=1
+                    conection_errors += 1
                     progress_bar(actual_value=i + 1,
                                  max_value=ends,
                                  initial_message="Progress:",
-                                 end_message='⏳|  ' + get_str_time_running(t_begin) + '  |  ' + errors_text + '  |  ocid code: ' + ocid,
+                                 end_message='⏳|  ' + get_str_time_running(
+                                     t_begin) + '  |  ' + errors_text + '  |  ocid code: ' + ocid,
                                  error_indicator=True
                                  )
                     time.sleep(time_to_wait)
@@ -231,13 +223,14 @@ def getComplete_data(year,
                     error_message = str(err)
                     time_error = dt.now(time_zone).strftime("%H:%M:%S")
                     date_error = dt.now(time_zone).strftime("%d/%m/%Y")
-                    file_errors.write(str(i) + ',' + str(times_tried) + ',' + str(ocid) + ',' + date_error + ',' + time_error + ',' + error_message + "\n")
+                    file_errors.write(str(i) + ',' + str(times_tried) + ',' + str(
+                        ocid) + ',' + date_error + ',' + time_error + ',' + error_message + "\n")
 
-                    #print(color.LIGHTRED_EX + "\n\t" + error_message + "\n\tin ocid", str(ocid) + "\n")
+                    # print(color.LIGHTRED_EX + "\n\t" + error_message + "\n\tin ocid", str(ocid) + "\n")
 
             if (i + 1) % size_batch == 0 or (i + 1) == ends:
                 batch += 1
-                name = "dataComplete" + str(year) + "_batch" + str(batch) + ".json"
+                name = "dataComplete" + str(year) + "_batch" + '0'*(batch<10) + str(batch) + ".json"
                 with open(url_proyect + '/data/complete/' + str(year) + '/' + name, 'w') as file_batch:
                     json.dump(data_per_batch, file_batch, indent=4)
                 if batch != total_batches:
@@ -250,17 +243,33 @@ def getComplete_data(year,
                         "content": []
                     }
 
-            progress_bar(actual_value = i+1,
+            progress_bar(actual_value=i + 1,
                          max_value=ends,
                          initial_message="Progress:",
-                         end_message='⏳|  ' + get_str_time_running(t_begin) + '  |  ' + errors_text + '  |  ocid code: ' + ocid
+                         end_message=' |  ' + get_str_time_running(t_begin) + '  |  ' + errors_text +
+                                     '  |  ocid code: ' + ocid
                          )
 
-
+    compress_data_to_zip(dir_folder_tosave=url_proyect + '/data/complete/' + str(year),
+                         dir_folder_toread=url_proyect + '/data/complete/' + str(year),
+                         name_zip="dataComplete" + str(year) + '.zip')
 
 
 if __name__ == '__main__':
     year = '2022'
-    # generateDatasets(year=year, total_pages=getPages_per_year(year))
+
+    # Para descargar el resumen de la data
+    #generateDatasets(year=year, total_pages=getPages_per_year(year))
+
+    # Para descargar la data completa en base a la data de resumen
     getComplete_data(year=year)
+
+    # En caso de que la descarga de la data completa haya sido interrumpida
+    # Revise el número de batches que se hicieron e indicarlo en la línea de código
     #getComplete_data(year=year, ready_made_batches=1)
+
+    # Para comprimir la data completa "manualmente"
+    #compress_data_to_zip(dir_folder_tosave=url_proyect + '/data/complete/' + str(year),
+    #                     dir_folder_toread=url_proyect + '/data/complete/' + str(year),
+    #                     name_zip="dataComplete" + str(year) + '.zip')
+
