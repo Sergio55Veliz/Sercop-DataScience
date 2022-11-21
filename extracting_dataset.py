@@ -1,3 +1,5 @@
+import time
+
 from __init__ import *
 
 from math import ceil
@@ -117,7 +119,8 @@ def load_resume_data(year):
 def getComplete_data(year,
                      size_batch=10000,  # No usar tamaños mayores a 12000 o sino github no permitirá subirlos al repo
                      ready_made_batches=0,
-                     batches=None
+                     batches=None,
+                     to_zip_data=True
                      ):
     df = load_resume_data(year).dropna(subset=["ocid"]).sort_values(by="date", ascending=True)
 
@@ -250,9 +253,40 @@ def getComplete_data(year,
                                      '  |  ocid code: ' + ocid
                          )
 
-    compress_data_to_zip(dir_folder_tosave=url_proyect + '/data/complete/' + str(year),
-                         dir_folder_toread=url_proyect + '/data/complete/' + str(year),
-                         name_zip="dataComplete" + str(year) + '.zip')
+    if to_zip_data:
+        compress_data_to_zip(dir_folder_tosave=url_proyect + '/data/complete/' + str(year),
+                             dir_folder_toread=url_proyect + '/data/complete/' + str(year),
+                             name_zip="dataComplete" + str(year) + '.zip')
+
+
+def load_complete_data(year,
+                       to_unzip=True  # Si ya se tienen los archivos json, poner False
+                                      # Si solo se tienen los zip, poner True
+                       ):
+    if to_unzip:
+        _, zip_files = get_files(folder=url_proyect + '/data/complete/' + str(year),
+                                  extension='.zip')
+        for zf_name in zip_files:
+            extract_data_from_zip(dir_folder_tosave=url_proyect + '/data/complete/' + str(year),
+                                  dir_zip=url_proyect + '/data/complete/' + str(year) + '/' + zf_name
+                                  )
+        time.sleep(10)  # Esperar a que se terminen de guardar los documentos
+
+    _, json_files = get_files(folder=url_proyect + '/data/complete/' + str(year),
+                              extension='.json')
+
+    complete_data = {}
+    for jf_name in json_files:
+        print(jf_name)
+        json_direction = url_proyect + '/data/complete/' + str(year) + '/' + jf_name
+        data = json.load(open(json_direction))
+        if len(complete_data) == 0:
+            complete_data = data
+            del complete_data['total_posible_batches'], complete_data['batches'], complete_data['batch']
+        else:
+            complete_data['content'] += data['content']
+
+    return complete_data
 
 
 if __name__ == '__main__':
@@ -272,4 +306,7 @@ if __name__ == '__main__':
     #compress_data_to_zip(dir_folder_tosave=url_proyect + '/data/complete/' + str(year),
     #                     dir_folder_toread=url_proyect + '/data/complete/' + str(year),
     #                     name_zip="dataComplete" + str(year) + '.zip')
+
+    # Para cargar la data completa
+    #complete_data = load_complete_data(year, to_unzip=True)
 

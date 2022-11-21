@@ -3,6 +3,7 @@ import zipfile
 from utilities.utilities import verify_create_folder
 from utilities.utilities import size_archive
 from utilities.utilities import progress_bar
+from utilities.utilities import get_files
 
 
 def compress_data_to_zip(dir_folder_tosave,
@@ -22,9 +23,7 @@ def compress_data_to_zip(dir_folder_tosave,
     zips_created = 0
     archives_zipped = 0
     size_zipped = 0
-    # folder, subfolders, files
-    folder, _, files = list(os.walk(dir_folder_toread))[0]  # Solo obtenemos datos de la carpeta especificada como argumento
-    files = [f for f in files if f.endswith(extension)]
+    folder, files = get_files(folder=dir_folder_toread, extension=extension)
     print("\nProceso de compresión... ")
     progress_bar(actual_value=archives_zipped,
                  max_value=len(files),
@@ -70,10 +69,10 @@ def compress_data_to_zip(dir_folder_tosave,
 def extract_data_from_zip(dir_folder_tosave,
                           dir_zip  # Contiene el nombre del archivo a descomprimir
                           ):
-    fantasy_zip = zipfile.ZipFile(dir_zip)
+    zip = zipfile.ZipFile(dir_zip)
 
     verify_create_folder(dir_folder_tosave, verbose=False)
 
-    fantasy_zip.extractall(dir_folder_tosave)
-    fantasy_zip.close()
-    print("\n\tExtracted files successfully!!")
+    zip.extractall(dir_folder_tosave)
+    zip.close()
+    print("\n\tExtracted files successfully!! from: ", dir_zip)

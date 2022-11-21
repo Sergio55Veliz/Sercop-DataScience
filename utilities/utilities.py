@@ -46,3 +46,11 @@ def verify_create_folder(dir_folder, verbose=True):
 
 def size_archive(dir_archive):
     return round(os.stat(dir_archive).st_size * 1e-6, 2)
+
+
+def get_files(folder, extension=None):
+    # folder, subfolders, files
+    folder, _, files = list(os.walk(folder))[0]  # Solo obtenemos datos de la carpeta especificada como argumento
+    if not (extension is None):
+        files = [f for f in files if f.endswith(extension)]
+    return folder, files
