@@ -1,5 +1,3 @@
-import time
-
 from __init__ import *
 
 from math import ceil
@@ -180,7 +178,7 @@ def getComplete_data(year,
                 time.sleep(30)  # añade un retraso de 30s
 
             times_tried = 0
-            time_to_wait = 30
+            time_to_wait = 10
             reload_page = True
             while reload_page:  # Si surgen errores volvemos a hacer el request luego de un tiempo (time_to_wait)
                 times_tried += 1
@@ -190,6 +188,7 @@ def getComplete_data(year,
                     reload_page = False
                 except JSONDecodeError as jsondecErr:
                     json_errors += 1
+                    errors_text = '⚠errors: 🌐' + str(conection_errors) + '  📃' + str(json_errors)
                     progress_bar(actual_value=i + 1,
                                  max_value=ends,
                                  initial_message="Progress:",
@@ -211,6 +210,7 @@ def getComplete_data(year,
                     # print(color.LIGHTRED_EX + "\n\t" + error_message + "\n\tin ocid", str(ocid) + "\n")
                 except Exception as err:
                     conection_errors += 1
+                    errors_text = '⚠errors: 🌐' + str(conection_errors) + '  📃' + str(json_errors)
                     progress_bar(actual_value=i + 1,
                                  max_value=ends,
                                  initial_message="Progress:",
@@ -233,7 +233,7 @@ def getComplete_data(year,
 
             if (i + 1) % size_batch == 0 or (i + 1) == ends:
                 batch += 1
-                name = "dataComplete" + str(year) + "_batch" + '0'*(batch<10) + str(batch) + ".json"
+                name = "dataComplete" + str(year) + "_batch" + '0' * (batch < 10) + str(batch) + ".json"
                 with open(url_proyect + '/data/complete/' + str(year) + '/' + name, 'w') as file_batch:
                     json.dump(data_per_batch, file_batch, indent=4)
                 if batch != total_batches:
@@ -261,19 +261,17 @@ def getComplete_data(year,
 
 def load_complete_data(year,
                        to_unzip=True  # Si ya se tienen los archivos json, poner False
-                                      # Si solo se tienen los zip, poner True
+                       # Si solo se tienen los zip, poner True
                        ):
     if to_unzip:
-        _, zip_files = get_files(folder=url_proyect + '/data/complete/' + str(year),
-                                  extension='.zip')
+        _, zip_files = get_files(folder=url_proyect + '/data/complete/' + str(year), extension='.zip')
         for zf_name in zip_files:
             extract_data_from_zip(dir_folder_tosave=url_proyect + '/data/complete/' + str(year),
                                   dir_zip=url_proyect + '/data/complete/' + str(year) + '/' + zf_name
                                   )
         time.sleep(10)  # Esperar a que se terminen de guardar los documentos
 
-    _, json_files = get_files(folder=url_proyect + '/data/complete/' + str(year),
-                              extension='.json')
+    _, json_files = get_files(folder=url_proyect + '/data/complete/' + str(year), extension='.json')
 
     complete_data = {}
     for jf_name in json_files:
@@ -290,23 +288,26 @@ def load_complete_data(year,
 
 
 if __name__ == '__main__':
-    year = '2022'
+    year = '2021'
 
     # Para descargar el resumen de la data
-    #generateDatasets(year=year, total_pages=getPages_per_year(year))
+    # generateDatasets(year=year, total_pages=getPages_per_year(year))
 
     # Para descargar la data completa en base a la data de resumen
-    getComplete_data(year=year)
+    #getComplete_data(year=year)
 
     # En caso de que la descarga de la data completa haya sido interrumpida
     # Revise el número de batches que se hicieron e indicarlo en la línea de código
-    #getComplete_data(year=year, ready_made_batches=1)
+    #getComplete_data(year=year, ready_made_batches=6)
 
     # Para comprimir la data completa "manualmente"
-    #compress_data_to_zip(dir_folder_tosave=url_proyect + '/data/complete/' + str(year),
+    # compress_data_to_zip(dir_folder_tosave=url_proyect + '/data/complete/' + str(year),
     #                     dir_folder_toread=url_proyect + '/data/complete/' + str(year),
     #                     name_zip="dataComplete" + str(year) + '.zip')
 
     # Para cargar la data completa
-    #complete_data = load_complete_data(year, to_unzip=True)
+    # complete_data = load_complete_data(year, to_unzip=True)
 
+    # Data de la Superintendencia de Compañías
+    # Para descargarla ir a -> https://mercadodevalores.supercias.gob.ec/reportes/directorioCompanias.jsf
+    # descargas el excel, lo abres y exportas como .csv
