@@ -97,6 +97,8 @@ def generateDatasets(year,
     print('Tiempo total de ejecución: ', time.time() - t_start)
 
 
+
+
 def load_resume_data(year):
     try:
         directory = os.getcwd() + '\\data\\resume\\' + str(year)
@@ -112,7 +114,6 @@ def load_resume_data(year):
     list_dataFrames = [pd.read_csv(directory + "\\dataset" + str(year) + "_batch" + str(batch) + ".csv") for batch in
                        range(1, batches + 1)]
     return pd.concat(list_dataFrames)
-
 
 def getComplete_data(year,
                      size_batch=10000,  # No usar tamaños mayores a 12000 o sino github no permitirá subirlos al repo
@@ -263,6 +264,8 @@ def load_complete_data(year,
                        to_unzip=True  # Si ya se tienen los archivos json, poner False
                        # Si solo se tienen los zip, poner True
                        ):
+    verify_create_folder("/data/complete/mergedData")
+
     if to_unzip:
         _, zip_files = get_files(folder=url_proyect + '/data/complete/' + str(year), extension='.zip')
         for zf_name in zip_files:
@@ -273,19 +276,58 @@ def load_complete_data(year,
 
     _, json_files = get_files(folder=url_proyect + '/data/complete/' + str(year), extension='.json')
 
-    complete_data = {}
-    for jf_name in json_files:
-        print(jf_name)
-        json_direction = url_proyect + '/data/complete/' + str(year) + '/' + jf_name
-        data = json.load(open(json_direction))
-        if len(complete_data) == 0:
-            complete_data = data
-            del complete_data['total_posible_batches'], complete_data['batches'], complete_data['batch']
-        else:
-            complete_data['content'] += data['content']
+    with open(url_proyect + "/data/complete/mergedData/data"+year+".json", mode="a+", encoding="utf-8") as file:
+        file.write("[\n")
+        njson=len(json_files)
+        for i in range(njson):
+            jf_name=json_files[i]
+            complete_data = []
+            print(jf_name)
+            json_direction = url_proyect + '/data/complete/' + str(year) + '/' + jf_name
+            jsonData=open(json_direction)
+            data = json.load(jsonData)
+            if len(complete_data) == 0:
+                complete_data = data["content"]
+                #del complete_data['total_posible_batches'], complete_data['batches'], complete_data['batch']
+            else:
+                complete_data += data['content']
+            jsonData.close()
+            nCompleteData=len(complete_data)
+            for j in range(nCompleteData):
+                line=complete_data[j]
+                if j==(nCompleteData-1) and i==(njson-1):
+                    file.write("{}\n".format(json.dumps(line)))
+                else:
+                    file.write("{},\n".format(json.dumps(line)))
+        file.write("]")
 
     return complete_data
 
+def mergeResumeData(year):
+
+    verify_create_folder("/data/resume/mergedData")
+
+    _, json_files = get_files(folder=url_proyect + '/data/resume/' + str(year), extension='.csv')
+
+    with open(url_proyect + "/data/resume/mergedData/resumeData"+year+".csv", mode="a+", encoding="utf-8") as file:
+        file.write("id,ocid,year,month,method,internal_type,locality,region,suppliers,buyer,amount,date,title,description,budget\n")
+        njson=len(json_files)
+        for i in range(njson):
+            jf_name=json_files[i]
+            complete_data = []
+            print(jf_name)
+            csv_direction = url_proyect + '/data/resume/' + str(year) + '/' + jf_name
+            with open(csv_direction,mode="r",encoding="utf-8") as csvData:
+                csvData.readline()
+                for line in csvData:
+                    line=line.rstrip()
+                    complete_data.append(line)
+            nCompleteData=len(complete_data)
+            for j in range(nCompleteData):
+                line=complete_data[j]
+                file.write(line+"\n")
+
+    return complete_data
 
 if __name__ == '__main__':
     year = '2021'
@@ -306,7 +348,9 @@ if __name__ == '__main__':
     #                     name_zip="dataComplete" + str(year) + '.zip')
 
     # Para cargar la data completa
-    # complete_data = load_complete_data(year, to_unzip=True)
+    #complete_data = load_complete_data(year, to_unzip=True)
+
+    mergeResumeData(year)
 
     # Data de la Superintendencia de Compañías
     # Para descargarla ir a -> https://mercadodevalores.supercias.gob.ec/reportes/directorioCompanias.jsf
