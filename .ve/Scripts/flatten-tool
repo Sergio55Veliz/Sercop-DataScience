@@ -1,0 +1,7 @@
+#!"c:\Users\DELL\Desktop\ESPOL\CIENCIAS DE DATOS\proyecto\Sercop-DataScience\.ve\Scripts\python.exe"
+# EASY-INSTALL-DEV-SCRIPT: 'flattentool==0.19.0','flatten-tool'
+__requires__ = 'flattentool==0.19.0'
+__import__('pkg_resources').require('flattentool==0.19.0')
+__file__ = 'C:\\Users\\DELL\\Desktop\\ESPOL\\CIENCIAS DE DATOS\\proyecto\\Sercop-DataScience\\flatten-tool\\flatten-tool'
+with open(__file__) as f:
+    exec(compile(f.read(), __file__, 'exec'))

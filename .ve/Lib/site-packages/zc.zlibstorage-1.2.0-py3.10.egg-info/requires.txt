@@ -1,0 +1,8 @@
+setuptools
+ZODB
+zope.interface
+
+[test]
+zope.testing
+manuel
+ZEO[test]
