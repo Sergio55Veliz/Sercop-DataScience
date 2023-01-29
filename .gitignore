@@ -26,7 +26,4 @@ __pycache__/__init__.cpython-39.pyc
 .idea/misc.xml
 .idea/DataScience.iml
 .idea/misc.xml
-flatten-tool/
-data/
-__pycache__/
-utilities/
+data/complete/
